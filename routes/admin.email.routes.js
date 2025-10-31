@@ -1,11 +1,13 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const nodemailer = require('nodemailer');
+const nodemailer = require("nodemailer");
 
-const adminCodeStore = new Map(); 
+const adminEmailCodeStore = new Map();
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: process.env.MAIL_HOST || "smtp.gmail.com",
+  port: Number(process.env.MAIL_PORT) || 465,
+  secure: true,
   auth: {
     user: process.env.MAIL_USER,
     pass: process.env.MAIL_PASS,
@@ -18,37 +20,43 @@ router.post("/send-code", async (req, res) => {
 
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = Date.now() + 5 * 60 * 1000;
-  adminCodeStore.set(email, { code, expiresAt });
+  adminEmailCodeStore.set(email, { code, expiresAt });
 
-  res.json({ message: "인증코드가 전송됩니다. 잠시만 기다려주세요." });
-
-  transporter
-    .sendMail({
+  try {
+    await transporter.sendMail({
       from: `"롯데월드 관리자 인증" <${process.env.MAIL_USER}>`,
       to: email,
-      subject: "[롯데월드 관리자] 이메일 인증코드",
-      html: `<p>아래의 코드를 입력해주세요:</p><h2>${code}</h2><p>5분 이내에 입력해주세요.</p>`,
-    })
-    .then(() => console.log("이메일 전송 성공:", email))
-    .catch(err => console.error("이메일 전송 실패:", err.message));
+      subject: "롯데월드 관리자 계정 이메일 인증코드",
+      html: `
+        <p>관리자 계정 생성을 위한 인증코드입니다:</p>
+        <h2>${code}</h2>
+        <p>이 코드는 <strong>5분</strong> 내에 입력해야 유효합니다.</p>
+      `,
+    });
+    return res.json({ message: "관리자 인증코드가 전송되었습니다." });
+  } catch (err) {
+    return res.status(500).json({ message: "이메일 전송 실패", error: err.message });
+  }
 });
 
-router.post('/verify-code', (req, res) => {
+router.post("/verify-code", (req, res) => {
   const { email, code } = req.body;
-  const data = adminCodeStore.get(email);
-  if (!data) return res.status(400).json({ message: '인증코드를 먼저 요청해주세요.' });
+  if (!email || !code) return res.status(400).json({ message: "이메일과 인증코드가 필요합니다." });
+
+  const data = adminEmailCodeStore.get(email);
+  if (!data) return res.status(400).json({ message: "인증코드를 먼저 요청해주세요." });
 
   if (Date.now() > data.expiresAt) {
-    adminCodeStore.delete(email);
-    return res.status(400).json({ message: '인증코드가 만료되었습니다.' });
+    adminEmailCodeStore.delete(email);
+    return res.status(400).json({ message: "인증코드가 만료되었습니다." });
   }
 
   if (data.code !== code) {
-    return res.status(400).json({ message: '인증코드가 일치하지 않습니다.' });
+    return res.status(400).json({ message: "인증코드가 일치하지 않습니다." });
   }
 
-  adminCodeStore.delete(email);
-  return res.json({ message: '인증 성공' });
+  adminEmailCodeStore.delete(email);
+  return res.json({ message: "인증 성공" });
 });
 
 module.exports = router;
