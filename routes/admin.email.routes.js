@@ -12,25 +12,25 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-router.post('/send-code', async (req, res) => {
+router.post("/send-code", async (req, res) => {
   const { email } = req.body;
-  if (!email) return res.status(400).json({ message: '이메일이 필요합니다.' });
+  if (!email) return res.status(400).json({ message: "이메일이 필요합니다." });
 
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = Date.now() + 5 * 60 * 1000;
   adminCodeStore.set(email, { code, expiresAt });
 
-  try {
-    await transporter.sendMail({
-      from: `"LotteWorld 관리자 인증" <${process.env.MAIL_USER}>`,
+  res.json({ message: "인증코드가 전송됩니다. 잠시만 기다려주세요." });
+
+  transporter
+    .sendMail({
+      from: `"롯데월드 관리자 인증" <${process.env.MAIL_USER}>`,
       to: email,
-      subject: '[롯데월드 관리자] 이메일 인증코드',
+      subject: "[롯데월드 관리자] 이메일 인증코드",
       html: `<p>아래의 코드를 입력해주세요:</p><h2>${code}</h2><p>5분 이내에 입력해주세요.</p>`,
-    });
-    return res.json({ message: '인증코드가 전송되었습니다.' });
-  } catch (err) {
-    return res.status(500).json({ message: '이메일 전송 실패', error: err.message });
-  }
+    })
+    .then(() => console.log("이메일 전송 성공:", email))
+    .catch(err => console.error("이메일 전송 실패:", err.message));
 });
 
 router.post('/verify-code', (req, res) => {
