@@ -6,18 +6,12 @@ const emailCodeStore = new Map();
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 587,
-  secure: false, // TLS 사용
-  requireTLS: true,
+  port: 465, // SSL 포트
+  secure: true,
   auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
+    user: process.env.MAIL_USER, // Gmail 주소
+    pass: process.env.MAIL_PASS, // 앱 비밀번호
   },
-  tls: {
-    rejectUnauthorized: false, // 인증서 경고 무시
-  },
-  connectionTimeout: 5000, // 연결 5초 제한
-  socketTimeout: 7000,     // 전송 전체 7초 제한
 });
 
 router.post("/send-code", async (req, res) => {
@@ -29,31 +23,30 @@ router.post("/send-code", async (req, res) => {
   emailCodeStore.set(email, { code, expiresAt });
 
   try {
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: `"롯데월드 이메일 인증" <${process.env.MAIL_USER}>`,
       to: email,
       subject: "롯데월드 회원가입 이메일 인증코드",
       html: `
-        <div style="font-family: Pretendard, sans-serif; line-height:1.6">
-          <h2>이메일 인증 코드</h2>
-          <p>아래 코드를 입력해주세요 (5분간 유효)</p>
-          <div style="font-size:28px; font-weight:bold; color:#DA291C;">${code}</div>
+        <div style="font-family: Pretendard, sans-serif; line-height:1.6;">
+          <h2>롯데월드 이메일 인증</h2>
+          <p>아래 인증코드를 입력해주세요 (5분간 유효)</p>
+          <div style="font-size:28px;font-weight:bold;color:#DA291C;">${code}</div>
         </div>
       `,
     });
 
-    console.log("✅ 이메일 전송 성공:", email);
-    res.json({ message: "인증코드가 전송되었습니다." });
+    console.log("📧 이메일 전송 성공:", email, info.messageId);
+    return res.json({ message: "인증코드가 전송되었습니다." });
   } catch (err) {
     console.error("❌ 이메일 전송 실패:", err.message);
-    res.status(500).json({ message: "이메일 전송 실패", error: err.message });
+    return res.status(500).json({ message: "이메일 전송 실패", error: err.message });
   }
 });
 
 router.post("/verify-code", (req, res) => {
   const { email, code } = req.body;
-  if (!email || !code)
-    return res.status(400).json({ message: "이메일과 인증코드가 필요합니다." });
+  if (!email || !code) return res.status(400).json({ message: "이메일과 인증코드가 필요합니다." });
 
   const data = emailCodeStore.get(email);
   if (!data) return res.status(400).json({ message: "인증코드를 먼저 요청해주세요." });
@@ -63,8 +56,9 @@ router.post("/verify-code", (req, res) => {
     return res.status(400).json({ message: "인증코드가 만료되었습니다." });
   }
 
-  if (data.code !== code)
+  if (data.code !== code) {
     return res.status(400).json({ message: "인증코드가 일치하지 않습니다." });
+  }
 
   emailCodeStore.delete(email);
   res.json({ message: "인증 성공" });
