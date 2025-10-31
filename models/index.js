@@ -17,8 +17,8 @@ if (config.use_env_variable) {
   sequelize = new Sequelize(config.database, config.username, config.password, config);
 }
 
-const Ticket = require('./Ticket')(sequelize, Sequelize.DataTypes);
-const User = require('./User')(sequelize, Sequelize.DataTypes);
+const Ticket = require('./ticket')(sequelize, Sequelize.DataTypes);
+const User = require('./user')(sequelize, Sequelize.DataTypes);
 const TicketBenefit = require('./TicketBenefit')(sequelize, Sequelize.DataTypes);
 const CardBenefitGroup = require('./CardBenefitGroup')(sequelize, Sequelize.DataTypes);
 const CardBenefitOption = require('./CardBenefitOption')(sequelize, Sequelize.DataTypes);
