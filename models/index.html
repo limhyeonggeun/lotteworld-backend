@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>PDF 뷰어</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, 'Noto Sans KR', sans-serif;
+      background: #0e1117;
+      color: #eee;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-bottom: 1px solid #1f2637;
+      background: #0b111a;
+    }
+    header .controls button {
+      background: #1a1f2b;
+      color: #fff;
+      border: 1px solid #2a3147;
+      border-radius: 6px;
+      padding: 6px 10px;
+      margin-right: 4px;
+      cursor: pointer;
+    }
+    header .controls button:hover {
+      background: #232b3f;
+    }
+    #viewerContainer {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      background: #181b22;
+    }
+    canvas {
+      margin: 20px auto;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>📄 <strong>PDF 뷰어</strong></div>
+    <div class="controls">
+      <button id="prev">이전</button>
+      <span id="page_info"></span>
+      <button id="next">다음</button>
+      <button id="zoom_out">-</button>
+      <button id="zoom_in">+</button>
+    </div>
+  </header>
+
+  <div id="viewerContainer">
+    <canvas id="pdfCanvas"></canvas>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const pdfUrl = params.get('src');
+
+    if (!pdfUrl) {
+      document.body.innerHTML = "<p style='padding:20px;color:#ff8080'>오류: URL에 <code>?src=PDF주소</code>를 붙이세요.</p>";
+      throw new Error("PDF 경로 누락");
+    }
+
+    let pdfDoc = null;
+    let pageNum = 1;
+    let scale = 1.2;
+    const canvas = document.getElementById('pdfCanvas');
+    const ctx = canvas.getContext('2d');
+    const pageInfo = document.getElementById('page_info');
+
+    async function renderPage(num) {
+      const page = await pdfDoc.getPage(num);
+      const viewport = page.getViewport({ scale });
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      const renderContext = { canvasContext: ctx, viewport: viewport };
+      await page.render(renderContext).promise;
+
+      pageInfo.textContent = `페이지 ${num} / ${pdfDoc.numPages}`;
+    }
+
+    async function loadPdf() {
+      const loadingTask = pdfjsLib.getDocument(pdfUrl);
+      pdfDoc = await loadingTask.promise;
+      renderPage(pageNum);
+    }
+
+    document.getElementById('prev').addEventListener('click', () => {
+      if (pageNum <= 1) return;
+      pageNum--;
+      renderPage(pageNum);
+    });
+
+    document.getElementById('next').addEventListener('click', () => {
+      if (pageNum >= pdfDoc.numPages) return;
+      pageNum++;
+      renderPage(pageNum);
+    });
+
+    document.getElementById('zoom_in').addEventListener('click', () => {
+      scale += 0.2;
+      renderPage(pageNum);
+    });
+
+    document.getElementById('zoom_out').addEventListener('click', () => {
+      if (scale > 0.4) scale -= 0.2;
+      renderPage(pageNum);
+    });
+
+    loadPdf().catch(err => {
+      document.body.innerHTML = `<p style='padding:20px;color:#ff8080'>PDF 로드 오류: ${err.message}</p>`;
+    });
+  </script>
+</body>
+</html>
