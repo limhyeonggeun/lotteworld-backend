@@ -5,7 +5,9 @@ const nodemailer = require("nodemailer");
 const emailCodeStore = new Map();
 
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false, 
   auth: {
     user: process.env.MAIL_USER,
     pass: process.env.MAIL_PASS,
@@ -13,16 +15,14 @@ const transporter = nodemailer.createTransport({
 });
 
 router.post("/send-code", async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ message: "이메일이 필요합니다." });
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = Date.now() + 5 * 60 * 1000;
+  emailCodeStore.set(email, { code, expiresAt });
+
   try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ message: "이메일이 필요합니다." });
-    }
-
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 5 * 60 * 1000;
-    emailCodeStore.set(email, { code, expiresAt });
-
     await transporter.sendMail({
       from: `"롯데월드 이메일 인증" <${process.env.MAIL_USER}>`,
       to: email,
@@ -31,35 +31,32 @@ router.post("/send-code", async (req, res) => {
     });
 
     console.log("이메일 전송 성공:", email);
-    return res.json({ message: "인증코드가 이메일로 전송되었습니다." });
+    res.json({ message: "인증코드가 전송되었습니다." });
   } catch (err) {
     console.error("이메일 전송 실패:", err.message);
-    return res.status(500).json({ message: "이메일 전송 실패", error: err.message });
+    res.status(500).json({ message: "이메일 전송 실패", error: err.message });
   }
 });
 
 router.post("/verify-code", (req, res) => {
   const { email, code } = req.body;
-  if (!email || !code) {
+  if (!email || !code)
     return res.status(400).json({ message: "이메일과 인증코드가 필요합니다." });
-  }
 
   const data = emailCodeStore.get(email);
-  if (!data) {
+  if (!data)
     return res.status(400).json({ message: "인증코드를 먼저 요청해주세요." });
-  }
 
   if (Date.now() > data.expiresAt) {
     emailCodeStore.delete(email);
     return res.status(400).json({ message: "인증코드가 만료되었습니다." });
   }
 
-  if (data.code !== code) {
+  if (data.code !== code)
     return res.status(400).json({ message: "인증코드가 일치하지 않습니다." });
-  }
 
   emailCodeStore.delete(email);
-  return res.json({ message: "인증 성공" });
+  res.json({ message: "인증 성공" });
 });
 
 module.exports = router;
