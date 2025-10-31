@@ -19,6 +19,14 @@
     "database": "railway",
     "host": "maglev.proxy.rlwy.net",
     "port": 20882,
-    "dialect": "mariadb"
+    "dialect": "mariadb",
+    "dialectOptions": {
+      "connectTimeout": 10000,
+      "allowPublicKeyRetrieval": true,
+      "ssl": {
+        "require": true,
+        "rejectUnauthorized": false
+      }
+    }
   }
 }
