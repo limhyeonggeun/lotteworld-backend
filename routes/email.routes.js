@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { Resend } = require("resend");
 
-const resend = new Resend(process.env.MAIL_PASS); 
+const resend = new Resend(process.env.MAIL_PASS);
 const emailCodeStore = new Map();
 
 router.post("/send-code", async (req, res) => {
@@ -15,7 +15,7 @@ router.post("/send-code", async (req, res) => {
 
   try {
     const data = await resend.emails.send({
-      from: "LotteWorld <lotteworld@resend.dev>", 
+      from: "LotteWorld <onboarding@resend.dev>",
       to: email,
       subject: "롯데월드 회원가입 이메일 인증코드",
       html: `
@@ -27,7 +27,7 @@ router.post("/send-code", async (req, res) => {
       `,
     });
 
-    console.log("이메일 전송 성공:", email, data.id || "");
+    console.log("이메일 전송 성공:", email, data?.id || "");
     res.json({ message: "인증코드가 전송되었습니다." });
   } catch (err) {
     console.error("이메일 전송 실패:", err);
@@ -37,10 +37,12 @@ router.post("/send-code", async (req, res) => {
 
 router.post("/verify-code", (req, res) => {
   const { email, code } = req.body;
-  if (!email || !code) return res.status(400).json({ message: "이메일과 인증코드가 필요합니다." });
+  if (!email || !code)
+    return res.status(400).json({ message: "이메일과 인증코드가 필요합니다." });
 
   const data = emailCodeStore.get(email);
-  if (!data) return res.status(400).json({ message: "인증코드를 먼저 요청해주세요." });
+  if (!data)
+    return res.status(400).json({ message: "인증코드를 먼저 요청해주세요." });
 
   if (Date.now() > data.expiresAt) {
     emailCodeStore.delete(email);
