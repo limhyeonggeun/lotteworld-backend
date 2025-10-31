@@ -1,21 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
+const resend = new Resend(process.env.MAIL_PASS); 
 const emailCodeStore = new Map();
-
-const transporter = nodemailer.createTransport({
-  host: process.env.MAIL_HOST || "smtp.resend.com",
-  port: Number(process.env.MAIL_PORT) || 587,
-  secure: false, 
-  auth: {
-    user: process.env.MAIL_USER || "resend",
-    pass: process.env.MAIL_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false, 
-  },
-});
 
 router.post("/send-code", async (req, res) => {
   const { email } = req.body;
@@ -25,19 +13,25 @@ router.post("/send-code", async (req, res) => {
   const expiresAt = Date.now() + 5 * 60 * 1000;
   emailCodeStore.set(email, { code, expiresAt });
 
-  res.json({ message: "인증코드 요청 완료. 이메일 전송 중..." });
-
   try {
-    const info = await transporter.sendMail({
-      from: `"롯데월드 이메일 인증" <${process.env.MAIL_FROM_EMAIL}>`,
+    const data = await resend.emails.send({
+      from: "LotteWorld <lotteworld@resend.dev>", 
       to: email,
       subject: "롯데월드 회원가입 이메일 인증코드",
-      html: `<p>이메일 인증 코드입니다:</p><h2>${code}</h2><p>5분 내에 입력해주세요.</p>`,
+      html: `
+        <div style="font-family: Pretendard, sans-serif; line-height: 1.6;">
+          <h2>이메일 인증 코드</h2>
+          <p>아래 코드를 입력해주세요 (5분간 유효)</p>
+          <div style="font-size: 28px; font-weight: bold; color: #DA291C;">${code}</div>
+        </div>
+      `,
     });
 
-    console.log("이메일 전송 성공:", email, info.messageId);
+    console.log("이메일 전송 성공:", email, data.id || "");
+    res.json({ message: "인증코드가 전송되었습니다." });
   } catch (err) {
-    console.error("이메일 전송 실패:", err.message);
+    console.error("이메일 전송 실패:", err);
+    res.status(500).json({ message: "이메일 전송 실패", error: err.message });
   }
 });
 
