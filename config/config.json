@@ -17,7 +17,8 @@
     "username": "root",
     "password": "nZOYTRFKbgiyjRMNfikDzwKWBHACaRNE",
     "database": "railway",
-    "host": "mysql.railway.internal",
+    "host": "maglev.proxy.rlwy.net",
+    "port": 20882,
     "dialect": "mariadb"
   }
 }
