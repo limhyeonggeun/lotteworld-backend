@@ -5,11 +5,18 @@ const SCOPES = ['https://www.googleapis.com/auth/firebase.messaging'];
 let serviceAccount;
 
 try {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
+    console.log("✅ FIREBASE_SERVICE_ACCOUNT_BASE64 환경변수 감지됨");
+    const jsonString = Buffer.from(
+      process.env.FIREBASE_SERVICE_ACCOUNT_BASE64,
+      'base64'
+    ).toString('utf-8');
+    serviceAccount = JSON.parse(jsonString);
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     console.log("✅ FIREBASE_SERVICE_ACCOUNT 환경변수 감지됨");
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
   } else {
-    throw new Error('❌ FIREBASE_SERVICE_ACCOUNT 환경변수가 존재하지 않습니다.');
+    throw new Error('❌ FIREBASE_SERVICE_ACCOUNT 관련 환경변수가 존재하지 않습니다.');
   }
 } catch (err) {
   console.error("🚨 Firebase Service Account 파싱 오류:", err.message);
