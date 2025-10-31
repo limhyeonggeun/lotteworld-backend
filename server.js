@@ -1,3 +1,11 @@
+if (process.env.RAILWAY_ENVIRONMENT) {
+  console.log("🚀 Railway 환경 감지됨 - .env 로드 생략");
+  process.env.DOTENV_KEY_MISSING = "1";
+} else {
+  require("dotenv").config();
+  console.log("🌱 로컬 환경 - .env 로드 완료");
+}
+
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
