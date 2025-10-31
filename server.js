@@ -1,4 +1,9 @@
-require('dotenv').config();
+if (process.env.RAILWAY_ENVIRONMENT_NAME) {
+  console.log("Running on Railway - skipping .env load");
+} else {
+  require('dotenv').config();
+  console.log("Local development - loaded .env");
+}
 
 const express = require('express');
 const cors = require('cors');
