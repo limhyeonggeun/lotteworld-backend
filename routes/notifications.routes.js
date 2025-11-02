@@ -229,7 +229,8 @@ router.post("/:id/resend", async (req, res) => {
     await notification.update({
       status: success ? "sent" : "failed",
       failReason: success ? null : "FCM 전송 실패",
-      scheduledAt: new Date(),
+      scheduledAt: new Date(), 
+      deliveryMethod: "push",
     });
 
     res.json({
