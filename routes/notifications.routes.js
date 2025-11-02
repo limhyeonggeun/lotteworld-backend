@@ -165,13 +165,28 @@ router.put("/:id", async (req, res) => {
 });
 
 router.post("/bulk-delete", async (req, res) => {
-  const { ids } = req.body;
-  if (!Array.isArray(ids)) return res.status(400).json({ message: "ids 배열이 필요합니다." });
   try {
-    const deleteCount = await Notification.destroy({ where: { id: ids } });
-    res.json({ message: "일괄 삭제 완료", count: deleteCount });
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "ids 배열이 필요합니다." });
+    }
+    const numericIds = ids
+      .map((v) => Number(v))
+      .filter((v) => Number.isInteger(v) && v > 0);
+
+    if (numericIds.length === 0) {
+      return res.status(400).json({ message: "유효한 id가 없습니다." });
+    }
+
+    const deleteCount = await Notification.destroy({
+      where: { id: numericIds },
+    });
+
+    return res.json({ message: "일괄 삭제 완료", count: deleteCount });
   } catch (err) {
-    res.status(500).json({ message: "일괄 삭제 실패", error: err.message });
+    console.error("bulk-delete 오류:", err);
+    return res.status(500).json({ message: "일괄 삭제 실패", error: err.message });
   }
 });
 
