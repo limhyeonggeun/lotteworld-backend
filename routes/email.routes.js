@@ -1,21 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
+const resend = new Resend(process.env.MAIL_API_KEY);
 const emailCodeStore = new Map();
 
-// ✅ Gmail SMTP 설정
-const transporter = nodemailer.createTransport({
-  host: process.env.MAIL_HOST || "smtp.gmail.com",
-  port: Number(process.env.MAIL_PORT) || 465,
-  secure: true, // Gmail SSL
-  auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS, // 앱 비밀번호 (16자리)
-  },
-});
-
-// ✅ 인증코드 발송
 router.post("/send-code", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: "이메일이 필요합니다." });
@@ -25,10 +14,10 @@ router.post("/send-code", async (req, res) => {
   emailCodeStore.set(email, { code, expiresAt });
 
   try {
-    await transporter.sendMail({
-      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_EMAIL}>`,
+    const data = await resend.emails.send({
+      from: `${process.env.MAIL_FROM_NAME} <${process.env.MAIL_FROM_EMAIL}>`,
       to: email,
-      subject: "[롯데월드] 이메일 인증코드",
+      subject: "롯데월드 회원가입 이메일 인증코드",
       html: `
         <div style="font-family:'Pretendard',sans-serif;line-height:1.6;color:#333;">
           <h2>롯데월드 이메일 인증</h2>
@@ -39,7 +28,7 @@ router.post("/send-code", async (req, res) => {
       `,
     });
 
-    console.log("✅ 이메일 전송 성공:", email);
+    console.log("✅ 이메일 전송 성공:", email, data.id || "");
     res.json({ message: "인증코드가 전송되었습니다." });
   } catch (err) {
     console.error("❌ 이메일 전송 실패:", err.message);
@@ -47,13 +36,13 @@ router.post("/send-code", async (req, res) => {
   }
 });
 
-// ✅ 인증코드 검증
 router.post("/verify-code", (req, res) => {
   const { email, code } = req.body;
+  const data = emailCodeStore.get(email);
+
   if (!email || !code)
     return res.status(400).json({ message: "이메일과 인증코드가 필요합니다." });
 
-  const data = emailCodeStore.get(email);
   if (!data)
     return res.status(400).json({ message: "인증코드를 먼저 요청해주세요." });
 

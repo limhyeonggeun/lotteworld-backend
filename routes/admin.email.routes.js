@@ -1,19 +1,11 @@
 const express = require("express");
 const router = express.Router();
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
+const resend = new Resend(process.env.MAIL_API_KEY);
 const adminEmailCodeStore = new Map();
 
-const transporter = nodemailer.createTransport({
-  host: process.env.MAIL_HOST || "smtp.resend.com",
-  port: Number(process.env.MAIL_PORT) || 587,
-  secure: false,
-  auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
-  },
-});
-
+// ✅ 관리자 이메일 인증코드 발송
 router.post("/send-code", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: "이메일이 필요합니다." });
@@ -23,31 +15,35 @@ router.post("/send-code", async (req, res) => {
   adminEmailCodeStore.set(email, { code, expiresAt });
 
   try {
-    await transporter.sendMail({
-      from: `"롯데월드 관리자 인증" <${process.env.MAIL_FROM_EMAIL}>`,
+    const data = await resend.emails.send({
+      from: `${process.env.MAIL_FROM_NAME} 관리자 <${process.env.MAIL_FROM_EMAIL}>`,
       to: email,
-      subject: "롯데월드 관리자 계정 이메일 인증코드",
+      subject: "[롯데월드 관리자] 이메일 인증코드",
       html: `
-        <p>관리자 계정 생성을 위한 인증코드입니다:</p>
-        <h2>${code}</h2>
-        <p>이 코드는 <strong>5분</strong> 내에 입력해야 유효합니다.</p>
+        <div style="font-family:'Pretendard',sans-serif;line-height:1.6;color:#333;">
+          <h2>롯데월드 관리자 인증</h2>
+          <p>관리자 계정 생성을 위한 인증코드입니다 (5분간 유효)</p>
+          <div style="font-size:24px;font-weight:bold;color:#DA291C;margin-top:10px;">${code}</div>
+          <p style="font-size:13px;color:#888;margin-top:10px;">본 메일은 발신전용입니다.</p>
+        </div>
       `,
     });
 
-    console.log("✅ 관리자 인증 메일 전송 성공:", email);
-    return res.json({ message: "관리자 인증코드가 전송되었습니다." });
+    console.log("✅ [Admin] 이메일 전송 성공:", email, data.id || "");
+    res.json({ message: "관리자 인증코드가 전송되었습니다." });
   } catch (err) {
-    console.error("❌ 관리자 인증 메일 전송 실패:", err.message);
-    return res.status(500).json({ message: "이메일 전송 실패", error: err.message });
+    console.error("❌ [Admin] 이메일 전송 실패:", err.message);
+    res.status(500).json({ message: "이메일 전송 실패", error: err.message });
   }
 });
 
+// ✅ 관리자 인증 검증
 router.post("/verify-code", (req, res) => {
   const { email, code } = req.body;
+  const data = adminEmailCodeStore.get(email);
+
   if (!email || !code)
     return res.status(400).json({ message: "이메일과 인증코드가 필요합니다." });
-
-  const data = adminEmailCodeStore.get(email);
   if (!data)
     return res.status(400).json({ message: "인증코드를 먼저 요청해주세요." });
 
