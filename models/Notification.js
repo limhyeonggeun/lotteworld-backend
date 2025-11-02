@@ -53,6 +53,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
       },
+      failReason: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
     });
   
     Notification.associate = (models) => {

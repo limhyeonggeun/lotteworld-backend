@@ -5,6 +5,11 @@ const trySendPush = require('../utils/sendPush');
 const { Op } = require('sequelize');
 
 const router = express.Router();
+const success = await trySendPush(n, user.fcmToken);
+await n.update({
+  status: success ? "sent" : "failed",
+  failReason: success ? null : "FCM 전송 실패 또는 유효하지 않은 토큰",
+});
 
 router.get('/user/:userId', auth, async (req, res) => {
     const { userId } = req.params;
@@ -241,4 +246,18 @@ router.post('/bulk-resend', async (req, res) => {
   }
 });
 
+router.get("/failed", async (req, res) => {
+  try {
+    const failed = await Notification.findAll({
+      where: { status: "failed" },
+      include: [{ model: User, attributes: ["id", "email"] }],
+      order: [["updatedAt", "DESC"]],
+    });
+
+    res.json(failed);
+  } catch (err) {
+    console.error("실패한 알림 조회 오류:", err);
+    res.status(500).json({ message: "실패한 알림 조회 실패", error: err.message });
+  }
+});
 module.exports = router;
