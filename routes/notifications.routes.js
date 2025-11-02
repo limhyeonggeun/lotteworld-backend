@@ -190,22 +190,36 @@ router.post("/bulk-delete", async (req, res) => {
   }
 });
 
-router.post("/bulk-resend", async (req, res) => {
+router.post("/bulk-delete", async (req, res) => {
   const { ids } = req.body;
   if (!Array.isArray(ids)) return res.status(400).json({ message: "ids 배열이 필요합니다." });
+
   try {
-    const notifications = await Notification.findAll({ where: { id: ids } });
-    for (const n of notifications) {
-      const targetUser = await User.findByPk(n.userId, { attributes: ["fcmToken"] });
-      if (!targetUser?.fcmToken) {
-        await n.update({ status: "failed", failReason: "FCM 토큰 없음" });
-        continue;
+    const targets = await Notification.findAll({ where: { id: ids } });
+
+    if (!targets.length)
+      return res.status(404).json({ message: "삭제할 알림을 찾을 수 없습니다." });
+
+    const deleteConditions = targets.map((target) => {
+      if (target.recipient === "all_users") {
+        return {
+          recipient: "all_users",
+          title: target.title,
+          content: target.content,
+          type: target.type,
+          scheduledAt: target.scheduledAt,
+        };
       }
-      await sendNotificationStatus(n, targetUser);
-    }
-    res.json({ message: "일괄 재전송 완료", count: notifications.length });
+      return { id: target.id };
+    });
+
+    const deleteCount = await Notification.destroy({
+      where: { [Op.or]: deleteConditions },
+    });
+
+    res.json({ message: "일괄 삭제 완료", count: deleteCount });
   } catch (err) {
-    res.status(500).json({ message: "일괄 재전송 실패", error: err.message });
+    res.status(500).json({ message: "일괄 삭제 실패", error: err.message });
   }
 });
 
@@ -228,6 +242,54 @@ router.post("/:id/resend", async (req, res) => {
     if (!notification)
       return res.status(404).json({ message: "해당 알림이 존재하지 않습니다." });
 
+    if (notification.recipient === "all_users") {
+      const failedNotifications = await Notification.findAll({
+        where: {
+          title: notification.title,
+          content: notification.content,
+          type: notification.type,
+          scheduledAt: notification.scheduledAt,
+          recipient: "all_users",
+          status: "failed",
+        },
+        include: [{ model: User, attributes: ["id", "fcmToken"] }],
+      });
+
+      if (!failedNotifications.length) {
+        return res.json({ message: "실패한 대상이 없습니다.", success: true });
+      }
+
+      let sentCount = 0;
+      let failCount = 0;
+
+      await Promise.all(
+        failedNotifications.map(async (n) => {
+          const user = n.User;
+          if (!user?.fcmToken) {
+            await n.update({ failReason: "FCM 토큰 없음" });
+            failCount++;
+            return;
+          }
+
+          const success = await trySendPush(n, user.fcmToken);
+          await n.update({
+            status: success ? "sent" : "failed",
+            failReason: success ? null : "FCM 전송 실패",
+            scheduledAt: new Date(),
+          });
+
+          success ? sentCount++ : failCount++;
+        })
+      );
+
+      return res.json({
+        message: `실패 사용자 재전송 완료 (${sentCount} 성공, ${failCount} 실패)`,
+        success: true,
+        sentCount,
+        failCount,
+      });
+    }
+
     const targetUser = await User.findByPk(notification.userId, {
       attributes: ["fcmToken"],
     });
@@ -244,7 +306,7 @@ router.post("/:id/resend", async (req, res) => {
     await notification.update({
       status: success ? "sent" : "failed",
       failReason: success ? null : "FCM 전송 실패",
-      scheduledAt: new Date(), 
+      scheduledAt: new Date(),
       deliveryMethod: "push",
     });
 
