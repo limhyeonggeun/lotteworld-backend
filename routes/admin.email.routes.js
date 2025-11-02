@@ -1,20 +1,25 @@
 const express = require("express");
 const router = express.Router();
 const { Resend } = require("resend");
+const { AdminUser } = require("../models"); 
 
 const resend = new Resend(process.env.MAIL_API_KEY);
 const adminEmailCodeStore = new Map();
 
-// ✅ 관리자 이메일 인증코드 발송
 router.post("/send-code", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: "이메일이 필요합니다." });
 
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = Date.now() + 5 * 60 * 1000;
-  adminEmailCodeStore.set(email, { code, expiresAt });
-
   try {
+    const existingAdmin = await AdminUser.findOne({ where: { email } });
+    if (existingAdmin) {
+      return res.status(409).json({ message: "이미 등록된 관리자 이메일입니다." });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 5 * 60 * 1000;
+    adminEmailCodeStore.set(email, { code, expiresAt });
+
     const data = await resend.emails.send({
       from: `${process.env.MAIL_FROM_NAME} 관리자 <${process.env.MAIL_FROM_EMAIL}>`,
       to: email,
@@ -29,15 +34,14 @@ router.post("/send-code", async (req, res) => {
       `,
     });
 
-    console.log("✅ [Admin] 이메일 전송 성공:", email, data.id || "");
+    console.log("[Admin] 이메일 전송 성공:", email, data.id || "");
     res.json({ message: "관리자 인증코드가 전송되었습니다." });
   } catch (err) {
-    console.error("❌ [Admin] 이메일 전송 실패:", err.message);
+    console.error("[Admin] 이메일 전송 실패:", err.message);
     res.status(500).json({ message: "이메일 전송 실패", error: err.message });
   }
 });
 
-// ✅ 관리자 인증 검증
 router.post("/verify-code", (req, res) => {
   const { email, code } = req.body;
   const data = adminEmailCodeStore.get(email);
