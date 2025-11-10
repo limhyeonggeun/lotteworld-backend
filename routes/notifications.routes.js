@@ -292,4 +292,25 @@ router.post("/:id/resend", async (req, res) => {
   }
 });
 
+// ✅ 사용자별 알림 조회
+router.get("/user/:userId", async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: "유효하지 않은 userId" });
+    }
+
+    const notifications = await Notification.findAll({
+      where: { userId },
+      order: [["createdAt", "DESC"]],
+    });
+
+    // 알림이 없어도 200으로 빈 배열 반환 (프론트 404 방지)
+    return res.status(200).json(notifications);
+  } catch (err) {
+    console.error("사용자 알림 조회 실패:", err);
+    res.status(500).json({ message: "사용자 알림 조회 실패", error: err.message });
+  }
+});
+
 module.exports = router;
