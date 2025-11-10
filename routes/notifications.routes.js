@@ -292,7 +292,6 @@ router.post("/:id/resend", async (req, res) => {
   }
 });
 
-// ✅ 사용자별 알림 조회
 router.get("/user/:userId", async (req, res) => {
   try {
     const userId = parseInt(req.params.userId, 10);
@@ -305,11 +304,32 @@ router.get("/user/:userId", async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    // 알림이 없어도 200으로 빈 배열 반환 (프론트 404 방지)
     return res.status(200).json(notifications);
   } catch (err) {
     console.error("사용자 알림 조회 실패:", err);
     res.status(500).json({ message: "사용자 알림 조회 실패", error: err.message });
+  }
+});
+
+router.put("/:id", async (req, res) => {
+  try {
+    const { read } = req.body;
+    const { id } = req.params;
+
+    const notification = await Notification.findByPk(id);
+    if (!notification) {
+      return res.status(404).json({ message: "해당 알림을 찾을 수 없습니다." });
+    }
+
+    await notification.update({
+      read: !!read,
+      status: read ? "read" : notification.status,
+    });
+
+    return res.status(200).json({ message: "알림 상태 업데이트 완료" });
+  } catch (err) {
+    console.error("알림 상태 업데이트 실패:", err);
+    res.status(500).json({ message: "알림 상태 업데이트 실패", error: err.message });
   }
 });
 
